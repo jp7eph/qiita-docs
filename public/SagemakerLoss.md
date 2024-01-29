@@ -1,0 +1,150 @@
+---
+title: SageMakerを触っていたらいつの間にか10万円請求された話
+tags:
+  - "AWS"
+  - "SageMaker"
+  - "やらかし"
+private: false
+updated_at: ""
+id: null
+organization_url_name: null
+slide: false
+ignorePublish: false
+---
+
+ねぇ知ってる？SageMaker Canvas ってログアウトするまで課金されるんだよ
+
+類似のやらかし記事が見当たらなかったので書いてみました。
+ちなみに執筆時点でまだ請求額が確定してないので円安に震えてます。。
+
+本記事は経緯や調査の流れを細かく書いているので「止め方が知りたいんだ！」という方は飛ばしてください。
+
+# 事の発端
+
+友人 A と趣味で開発をしており、SageMaker を使ったサービス開発をしているのですが、
+SageMaker Studio のコンソールを**よく分からずポチポチイジっていました。**（盛大なフラグ）
+
+実は以前も Rekognition で推論を止め忘れて予想外の請求をされたことがあったので、
+作業後には SageMaker のノートブックインスタンスを止めてからその日の作業終了しました。
+（同じ過ちを犯すとは我ながら全く学んでいませんね、、）
+
+# 発覚
+
+ある日クレカの明細を見ていたら AWS から請求がありました。
+![スクリーンショット 2024-01-26 1.34.06.jpg](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/145838/234a683d-863e-fb10-7233-717765a3a36d.jpeg)
+
+「先月は個人開発で触ったしこんなもんかー」と思っていましたが、
+え？もしかして？と思い、今月の請求予定金額を見てみると、、
+![GEiLoCDa8AAYVZt.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/145838/f61f3165-6ce8-a2f0-ccfa-b0f4c6346272.png)
+( ﾟ д ﾟ)「ん？？」「は！？10 万！？！？」 とリアルに二度見しました。
+開き直しても金額が変わらず、肝を冷やすとはまさにこの事。。
+
+# 調査してみた
+
+まずは請求書画面でサービス別料金を確認してみました。
+すると SageMaker で $600 超えの項目を発見。
+![スクリーンショット 2024-01-30 0.42.06.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/145838/08855f16-b8d9-021d-58eb-d3bbe630a5f4.png)
+
+`$1.9 per Hrs for Canvas:Workspace Instance (Session-Hrs):RunInstance in Asia Pacific (Tokyo)`
+なにそれ？おいしいの？？
+
+前述の通り SageMaker のノートブックインスタンスは止めたはずなので何故だろう？という気持ちになり、
+当初（多分今も） SageMaker に関する知識はゼロだったので料金欄を見ても `$1.9/h` というインタンスが見当たらず、ますます謎が深まっていました。
+
+https://aws.amazon.com/jp/sagemaker/pricing/
+
+## 課金の正体
+
+$1.9 という言葉を頼りにネットの海を彷徨うと、、、あった！！！！
+
+![スクリーンショット 2024-01-30 0.58.39.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/145838/6ae68b59-2c76-4a43-8cc3-818d9c7c995f.png)
+
+https://aws.amazon.com/jp/sagemaker/canvas/pricing/
+
+説明には以下のようなことが書かれていました。
+
+> この時間は、ユーザーが SageMaker Canvas アプリケーションを起動したときに開始され、ユーザーが SageMaker Canvas インターフェイスからログアウトするか、または管理者が AWS マネジメントコンソールから SageMaker Canvas アプリケーションを終了したときのいずれかに終了します。SageMaker Canvas からログアウトしている場合、定期的な請求は発生しません。
+
+「え？マネコンと SageMaker Studio からもログアウトしたよ？そもそもいつログインしたっけ？」
+
+### そもそも SageMaker Canvas とは
+
+ざっくりいうとノーコードで機械学習のモデルを生成できるソリューションだそうです。
+
+https://aws.amazon.com/jp/sagemaker/canvas
+
+# 課金を止める方法
+
+課金元は分かりましたが止め方が分からなかったので、またもネットの海を彷徨うと以下の動画に出会いました。
+
+https://www.youtube.com/watch?v=nBUxRdv09ZI
+
+私の環境では Organization と SSO で組織向けに SageMaker ドメインを設定していたので、動画とは違う少し深い場所にありました。
+
+`SageMaker > 左メニューの「ドメイン」 > 該当しそうなドメイン > 「ユーザプロファイル」タブ > 該当しそうなユーザ`
+
+すると、Canvas アプリが動いてました。。。
+
+![スクリーンショット 2024-01-22 0.00.36のコピー.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/145838/e2013c4b-0b86-6ca3-f792-83ad53cb5c01.png)
+
+どうやらブラウザやマネコンをログアウトしただけではインスタンスが止まらず、 Canvas のログアウトもしくはアプリの削除をしないと課金が止まらないようです。
+
+## 止める方法 その１
+
+前提：起動している Canvas のダッシュボードにログイン**できる**場合
+
+1. Canvas のダッシュボードにログインします
+2. 左下のログアウトボタンを押します
+   ![スクリーンショット 2024-01-30 1.37.27.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/145838/c7405979-eda5-84e9-e52b-317be771b681.png)
+
+## 止める方法 その２
+
+前提：該当ユーザの SageMaker Studio にログイン**できる**場合
+
+1. SageMaker Studio にログインします
+2. 左上の `Application` から `Canvas` を選択します
+3. `Stop Canvas`を押します
+   ![スクリーンショット 2024-01-30 1.39.35.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/145838/94e40abf-49a0-4d00-bbf7-17f6298ea56e.png)
+
+## 止める方法 その３
+
+前提：該当ユーザの SageMaker Studio にログイン**できない**場合
+
+1. SageMaker のドメインを管理できるユーザでマネコンにログインします
+2. `SageMaker > 左メニューの「ドメイン」 > 該当するドメイン > 「ユーザプロファイル」タブ > 該当するユーザ`
+3. アプリケーションタイプから`Canvas`になっているアクションで`アプリケーションを削除`を押します
+   ![スクリーンショット 2024-01-30 1.41.38.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/145838/29d58dcf-c806-2218-c13b-1efb4962ee2d.png)
+
+ちなみに今回は友人 A のユーザプロファイルで動作しており、私はログインできなかったので最後の方法で削除しました。
+
+# 対処
+
+## 対処その１ 予算の設定と料金通知 Bot を作成
+
+今回は高額請求に全く気づかなかったので、今更ですが課金アラームの設定を実施しました。
+既に設定していたつもりになっていたのですが、以前の個人開発で使っていた別アカウントに設定しただけで今回のアカウントには何も設定されていませんでした。。
+
+というわけで Lambda 経由で Discord の Webhook を叩いて呟いてもらうことにしました。
+
+![スクリーンショット 2024-01-30 1.55.42.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/145838/a0e4a12d-92d4-be4d-b68b-e15581c8084f.png)
+
+予算超過アラームは設定した閾値でしか発火しないため、もし超過した後に高額請求になると気づかないので毎日呟いてもらうことにしました。
+
+![スクリーンショット 2024-01-30 1.55.49.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/145838/fc7ed350-61b5-ca6e-eb13-6285c605c4ad.png)
+
+## 対処その２ IAM ロールの権限を絞る（未実施）
+
+こちらはそもそも Canvas を起動できないようするという方針です。
+SageMaker ドメイン作成時にアクティビティを選択する欄があるので Canvas を外せば良い気がします。
+
+![スクリーンショット 2024-01-30 2.00.07.png](https://qiita-image-store.s3.ap-northeast-1.amazonaws.com/0/145838/4404c3ba-26c4-3c1d-eaba-91b6f110e713.png)
+
+今回は個人開発ということもあり、今後使うかもしれないので実施してません。
+
+# 最後に
+
+Canvas を起動したと思われる友人 A 本人もいつ起動したのか全く記憶になく、起動していたことすら知りませんでした。
+
+SageMaker 怖い。。ではなく、料金アラームを設定した上で最低限の知識をつけてから使おう。という気持ちになって頂ければと思います。（盛大なブーメラン）
+
+本記事で参加しているキャンペーンの `新しい年に向けて良いスタートを切りたい方` とは相反するやらかし記事ですが、せめて笑い話に昇華してもらえれば幸いです。。
